@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dungeon Crawler — Roguelike</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#06060f;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:1rem}
+h1{color:#9b8fff;font-size:14px;letter-spacing:0.15em;font-weight:500;margin-bottom:12px;text-transform:uppercase}
+#rg{background:#0a0a0f;border-radius:12px;overflow:hidden;border:0.5px solid #222;width:fit-content}
+#rg-top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#111118;border-bottom:0.5px solid #222;flex-wrap:wrap;gap:8px}
+#rg-title{font-size:13px;font-weight:500;color:#9b8fff;letter-spacing:0.08em}
+#rg-stats{display:flex;gap:14px;font-size:12px}
+.rg-stat{display:flex;align-items:center;gap:5px;color:#aaa}
+.rg-stat span{color:#fff;font-weight:500}
+#rg-main{display:flex}
+#rg-canvas{display:block;background:#0a0a0f;flex-shrink:0}
+#rg-panel{width:180px;background:#0d0d14;border-left:0.5px solid #222;display:flex;flex-direction:column;padding:12px;gap:10px;font-size:12px;color:#aaa}
+#rg-panel h3{font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#555;font-weight:500;margin-bottom:4px}
+#rg-log{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:3px}
+.rg-log-entry{font-size:11px;line-height:1.4;color:#888}
+.rg-log-entry.good{color:#4ecb71}
+.rg-log-entry.bad{color:#e05c5c}
+.rg-log-entry.info{color:#7eb8f7}
+.rg-log-entry.loot{color:#f7c94b}
+#rg-inv{display:flex;flex-direction:column;gap:4px}
+.rg-item{font-size:11px;padding:4px 6px;background:#161620;border-radius:4px;border:0.5px solid #2a2a3a;color:#ccc}
+.rg-item.equipped{border-color:#9b8fff;color:#c4b9ff}
+#rg-bottom{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#111118;border-top:0.5px solid #222;font-size:11px;color:#555;flex-wrap:wrap;gap:8px}
+#rg-controls{display:flex;gap:6px;align-items:center}
+.rg-ctrl-group{display:flex;flex-direction:column;align-items:center;gap:3px}
+.rg-ctrl-row{display:flex;gap:3px}
+.rg-key{width:26px;height:26px;background:#1a1a28;border:0.5px solid #333;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#aaa;cursor:pointer;transition:background 0.1s;font-family:inherit}
+.rg-key:hover{background:#252535}
+.rg-key.active{background:#3a3a55;border-color:#9b8fff;color:#c4b9ff}
+#rg-newgame{padding:5px 12px;font-size:12px;background:#1e1e30;border:0.5px solid #444;border-radius:6px;color:#ccc;cursor:pointer;font-family:inherit}
+#rg-newgame:hover{background:#2a2a40;border-color:#9b8fff}
+#rg-floor-badge{font-size:11px;color:#9b8fff}
+#rg-wrap{position:relative}
+#rg-gameover{display:none;position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:10}
+#rg-gameover h2{color:#e05c5c;font-size:20px;font-weight:500}
+#rg-gameover p{color:#888;font-size:13px}
+#rg-gameover button{padding:8px 20px;background:#1e1e30;border:0.5px solid #9b8fff;border-radius:6px;color:#c4b9ff;cursor:pointer;font-size:13px;font-family:inherit}
+#rg-gameover button:hover{background:#2a2a40}
+footer{margin-top:16px;font-size:11px;color:#333;text-align:center}
+</style>
+</head>
+<body>
+<h1>Dungeon Crawler</h1>
+<div id="rg">
+  <div id="rg-top">
+    <div id="rg-title">ROGUELIKE</div>
+    <div id="rg-stats">
+      <div class="rg-stat">HP <span id="st-hp">20/20</span></div>
+      <div class="rg-stat">ATK <span id="st-atk">3</span></div>
+      <div class="rg-stat">DEF <span id="st-def">0</span></div>
+      <div class="rg-stat">XP <span id="st-xp">0</span></div>
+      <div class="rg-stat">LVL <span id="st-lvl">1</span></div>
+      <div class="rg-stat">Gold <span id="st-gold">0</span></div>
+    </div>
+    <div id="rg-floor-badge">Floor 1</div>
+  </div>
+  <div id="rg-wrap">
+    <div id="rg-main">
+      <canvas id="rg-canvas" width="500" height="420"></canvas>
+      <div id="rg-panel">
+        <div>
+          <h3>Message log</h3>
+          <div id="rg-log"></div>
+        </div>
+        <div>
+          <h3>Inventory</h3>
+          <div id="rg-inv"><div class="rg-item" style="color:#555">Empty</div></div>
+        </div>
+      </div>
+    </div>
+    <div id="rg-gameover">
+      <h2>You died.</h2>
+      <p id="rg-go-msg">Slain on floor 1</p>
+      <button onclick="initGame()">Play again</button>
+    </div>
+  </div>
+  <div id="rg-bottom">
+    <div>Arrow keys or WASD · bump enemies to attack · walk over items to pick up</div>
+    <div id="rg-controls">
+      <div class="rg-ctrl-group">
+        <div class="rg-ctrl-row"><div class="rg-key" id="key-up" onclick="tryMove(0,-1)">W</div></div>
+        <div class="rg-ctrl-row">
+          <div class="rg-key" id="key-left" onclick="tryMove(-1,0)">A</div>
+          <div class="rg-key" id="key-down" onclick="tryMove(0,1)">S</div>
+          <div class="rg-key" id="key-right" onclick="tryMove(1,0)">D</div>
+        </div>
+      </div>
+      <button id="rg-newgame" onclick="initGame()">New game</button>
+    </div>
+  </div>
+</div>
+<footer>Vibe-coded with Claude &middot; Procedural Dungeon Crawler</footer>
+
+<script>
+const COLS=50,ROWS=42,TILE=10;
+const T={WALL:0,FLOOR:1,DOOR:2,STAIRS:3};
+const C={WALL:'#1a1a2e',FLOOR:'#12121f',DOOR:'#7b5e2a',STAIRS:'#2a4a7b',
+  PLAYER:'#9b8fff',ENEMY_WEAK:'#e05c5c',ENEMY_MID:'#e08c3c',ENEMY_BOSS:'#c44ec4',
+  HP:'#e05c5c',GOLD:'#f7c94b',SWORD:'#85b7eb',SHIELD:'#97c459',POTION:'#f093b5',
+  VISITED:'#0f0f1a',FOG:'#080810',LIT:'#16162a'};
+
+let map,rooms,player,enemies,items,log,floor,gameOver,fov;
+const canvas=document.getElementById('rg-canvas');
+const ctx=canvas.getContext('2d');
+
+function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+function dist(a,b){return Math.abs(a.x-b.x)+Math.abs(a.y-b.y)}
+
+function initGame(){
+  floor=1;gameOver=false;
+  document.getElementById('rg-gameover').style.display='none';
+  player={x:0,y:0,hp:20,maxHp:20,atk:3,def:0,xp:0,lvl:1,gold:0,inv:[],nextLvl:10};
+  log=[];
+  addLog('You descend into the dungeon...','info');
+  generateFloor();render();updateUI();
+}
+
+function generateFloor(){
+  map=Array.from({length:ROWS},()=>Array(COLS).fill(T.WALL));
+  fov=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  rooms=[];enemies=[];items=[];
+  const minR=5,maxR=10,attempts=60;
+  for(let i=0;i<attempts;i++){
+    const w=rnd(minR,maxR),h=rnd(minR,maxR);
+    const x=rnd(1,COLS-w-2),y=rnd(1,ROWS-h-2);
+    const rect={x,y,w,h};
+    if(rooms.some(r=>rectsOverlap(r,rect,2)))continue;
+    rooms.push(rect);
+    for(let ry=y;ry<y+h;ry++)for(let rx=x;rx<x+w;rx++)map[ry][rx]=T.FLOOR;
+  }
+  for(let i=1;i<rooms.length;i++){
+    const a=roomCenter(rooms[i-1]),b=roomCenter(rooms[i]);
+    carveCorridor(a,b);
+  }
+  const start=roomCenter(rooms[0]);
+  player.x=start.x;player.y=start.y;
+  const sc=roomCenter(rooms[rooms.length-1]);
+  map[sc.y][sc.x]=T.STAIRS;
+  const enemyTypes=[
+    {name:'Goblin',hp:6,atk:2,def:0,xp:3,col:C.ENEMY_WEAK,sym:'g'},
+    {name:'Skeleton',hp:10,atk:3,def:1,xp:5,col:C.ENEMY_WEAK,sym:'s'},
+    {name:'Orc',hp:16,atk:5,def:2,xp:8,col:C.ENEMY_MID,sym:'O'},
+    {name:'Troll',hp:24,atk:7,def:3,xp:14,col:C.ENEMY_MID,sym:'T'},
+    {name:'Dragon',hp:40,atk:10,def:5,xp:30,col:C.ENEMY_BOSS,sym:'D'},
+  ];
+  const count=Math.min(rooms.length-1,4+floor*2);
+  for(let i=1;i<rooms.length&&enemies.length<count;i++){
+    const room=rooms[i];
+    const n=rnd(1,Math.min(3,1+Math.floor(floor/2)));
+    for(let j=0;j<n;j++){
+      const tier=Math.min(Math.floor(Math.random()*(1+floor*0.5)),enemyTypes.length-1);
+      const et=enemyTypes[tier];
+      const ex=rnd(room.x+1,room.x+room.w-2),ey=rnd(room.y+1,room.y+room.h-2);
+      if(ex===player.x&&ey===player.y)continue;
+      if(enemies.some(e=>e.x===ex&&e.y===ey))continue;
+      const hp=et.hp+rnd(0,floor*2);
+      enemies.push({...et,x:ex,y:ey,hp,maxHp:hp,id:Math.random()});
+    }
+  }
+  const itemPool=[
+    {name:'Health potion',type:'potion',val:10,col:C.POTION,sym:'!'},
+    {name:'Short sword',type:'weapon',val:2,col:C.SWORD,sym:'/'},
+    {name:'Long sword',type:'weapon',val:4,col:C.SWORD,sym:'/'},
+    {name:'Leather armor',type:'armor',val:1,col:C.SHIELD,sym:']'},
+    {name:'Chain mail',type:'armor',val:3,col:C.SHIELD,sym:']'},
+    {name:'Gold (5)',type:'gold',val:5,col:C.GOLD,sym:'$'},
+    {name:'Gold (15)',type:'gold',val:15,col:C.GOLD,sym:'$'},
+  ];
+  for(let i=1;i<rooms.length;i++){
+    if(Math.random()<0.6){
+      const room=rooms[i];
+      const ix=rnd(room.x+1,room.x+room.w-2),iy=rnd(room.y+1,room.y+room.h-2);
+      items.push({...itemPool[rnd(0,itemPool.length-1)],x:ix,y:iy,id:Math.random()});
+    }
+  }
+  computeFOV();
+  document.getElementById('rg-floor-badge').textContent=`Floor ${floor}`;
+}
+
+function rectsOverlap(a,b,pad){return a.x-pad<b.x+b.w+pad&&a.x+a.w+pad>b.x-pad&&a.y-pad<b.y+b.h+pad&&a.y+a.h+pad>b.y-pad}
+function roomCenter(r){return{x:Math.floor(r.x+r.w/2),y:Math.floor(r.y+r.h/2)}}
+function carveCorridor(a,b){
+  let x=a.x,y=a.y;
+  if(Math.random()<0.5){
+    while(x!==b.x){map[y][x]=T.FLOOR;x+=x<b.x?1:-1}
+    while(y!==b.y){map[y][x]=T.FLOOR;y+=y<b.y?1:-1}
+  }else{
+    while(y!==b.y){map[y][x]=T.FLOOR;y+=y<b.y?1:-1}
+    while(x!==b.x){map[y][x]=T.FLOOR;x+=x<b.x?1:-1}
+  }
+  map[y][x]=T.FLOOR;
+}
+function computeFOV(){
+  const radius=7;
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){if(fov[y][x]===2)fov[y][x]=1;}
+  const px=player.x,py=player.y;
+  for(let i=0;i<360;i++){
+    const angle=(i/360)*Math.PI*2;
+    let rx=Math.cos(angle),ry=Math.sin(angle);
+    let cx=px+0.5,cy=py+0.5;
+    for(let r=0;r<radius;r++){
+      const tx=Math.floor(cx),ty=Math.floor(cy);
+      if(tx<0||tx>=COLS||ty<0||ty>=ROWS)break;
+      fov[ty][tx]=2;
+      if(map[ty][tx]===T.WALL)break;
+      cx+=rx;cy+=ry;
+    }
+  }
+}
+function tryMove(dx,dy){
+  if(gameOver)return;
+  const nx=player.x+dx,ny=player.y+dy;
+  if(nx<0||nx>=COLS||ny<0||ny>=ROWS)return;
+  if(map[ny][nx]===T.WALL)return;
+  const enemy=enemies.find(e=>e.x===nx&&e.y===ny);
+  if(enemy){attackEnemy(enemy);enemyTurn();render();updateUI();return;}
+  player.x=nx;player.y=ny;
+  if(map[ny][nx]===T.STAIRS){
+    addLog(`You descend to floor ${floor+1}!`,'info');
+    floor++;generateFloor();render();updateUI();return;
+  }
+  const item=items.find(i=>i.x===nx&&i.y===ny);
+  if(item)pickupItem(item);
+  enemyTurn();computeFOV();render();updateUI();
+}
+function attackEnemy(e){
+  const dmg=Math.max(1,player.atk-e.def+rnd(-1,1));
+  e.hp-=dmg;
+  addLog(`You hit ${e.name} for ${dmg}! (${Math.max(0,e.hp)}/${e.maxHp} HP)`,'good');
+  if(e.hp<=0){
+    addLog(`${e.name} defeated! +${e.xp} XP`,'loot');
+    player.xp+=e.xp;
+    if(Math.random()<0.3){const g=rnd(2,12);player.gold+=g;addLog(`Found ${g} gold!`,'loot');}
+    enemies=enemies.filter(en=>en.id!==e.id);
+    checkLevelUp();
+  }
+}
+function enemyTurn(){
+  enemies.forEach(e=>{
+    if(fov[e.y]&&fov[e.y][e.x]!==2)return;
+    if(dist(e,player)===1){
+      const dmg=Math.max(0,e.atk-player.def+rnd(-1,1));
+      player.hp=Math.max(0,player.hp-dmg);
+      addLog(`${e.name} hits you for ${dmg}!`,'bad');
+      if(player.hp<=0){triggerGameOver();return;}
+    }else if(dist(e,player)<8){
+      const dx=Math.sign(player.x-e.x),dy=Math.sign(player.y-e.y);
+      for(const[mx,my]of[[dx,0],[0,dy],[dx,dy],[-dy,dx],[dy,-dx]]){
+        const nx=e.x+mx,ny=e.y+my;
+        if(nx<0||nx>=COLS||ny<0||ny>=ROWS)continue;
+        if(map[ny][nx]===T.WALL)continue;
+        if(enemies.some(o=>o.id!==e.id&&o.x===nx&&o.y===ny))continue;
+        if(nx===player.x&&ny===player.y)continue;
+        e.x=nx;e.y=ny;break;
+      }
+    }
+  });
+}
+function pickupItem(item){
+  if(item.type==='potion'){
+    player.hp=Math.min(player.maxHp,player.hp+item.val);
+    addLog(`Used ${item.name}! +${item.val} HP`,'loot');
+  }else if(item.type==='gold'){
+    player.gold+=item.val;addLog(`Picked up ${item.name}!`,'loot');
+  }else if(item.type==='weapon'){
+    const old=player.inv.find(i=>i.type==='weapon'&&i.equipped);
+    if(old){old.equipped=false;player.atk-=old.val;}
+    player.inv.push({...item,equipped:true});player.atk+=item.val;
+    addLog(`Equipped ${item.name}! ATK +${item.val}`,'loot');
+  }else if(item.type==='armor'){
+    const old=player.inv.find(i=>i.type==='armor'&&i.equipped);
+    if(old){old.equipped=false;player.def-=old.val;}
+    player.inv.push({...item,equipped:true});player.def+=item.val;
+    addLog(`Equipped ${item.name}! DEF +${item.val}`,'loot');
+  }
+  items=items.filter(i=>i.id!==item.id);
+}
+function checkLevelUp(){
+  if(player.xp>=player.nextLvl){
+    player.lvl++;player.xp-=player.nextLvl;
+    player.nextLvl=Math.floor(player.nextLvl*1.6);
+    const hpGain=rnd(4,8);player.maxHp+=hpGain;
+    player.hp=Math.min(player.maxHp,player.hp+hpGain);player.atk+=1;
+    addLog(`Level up! Now level ${player.lvl}. HP+${hpGain} ATK+1`,'info');
+  }
+}
+function triggerGameOver(){
+  gameOver=true;
+  const go=document.getElementById('rg-gameover');
+  go.style.display='flex';
+  document.getElementById('rg-go-msg').textContent=`Reached floor ${floor} · Level ${player.lvl} · ${player.gold} gold`;
+}
+function addLog(msg,type=''){
+  log.unshift({msg,type});if(log.length>20)log.pop();
+  document.getElementById('rg-log').innerHTML=log.slice(0,8).map(l=>`<div class="rg-log-entry ${l.type}">${l.msg}</div>`).join('');
+}
+function updateUI(){
+  document.getElementById('st-hp').textContent=`${player.hp}/${player.maxHp}`;
+  document.getElementById('st-atk').textContent=player.atk;
+  document.getElementById('st-def').textContent=player.def;
+  document.getElementById('st-xp').textContent=`${player.xp}/${player.nextLvl}`;
+  document.getElementById('st-lvl').textContent=player.lvl;
+  document.getElementById('st-gold').textContent=player.gold;
+  const equip=player.inv.filter(i=>i.equipped);
+  document.getElementById('rg-inv').innerHTML=equip.length===0
+    ?'<div class="rg-item" style="color:#555">Empty</div>'
+    :equip.map(i=>`<div class="rg-item equipped">${i.name}</div>`).join('');
+}
+function render(){
+  ctx.fillStyle='#080810';ctx.fillRect(0,0,canvas.width,canvas.height);
+  const vpW=Math.floor(canvas.width/TILE),vpH=Math.floor(canvas.height/TILE);
+  const camX=Math.max(0,Math.min(COLS-vpW,player.x-Math.floor(vpW/2)));
+  const camY=Math.max(0,Math.min(ROWS-vpH,player.y-Math.floor(vpH/2)));
+  for(let y=0;y<vpH;y++){
+    for(let x=0;x<vpW;x++){
+      const mx=camX+x,my=camY+y;
+      if(mx<0||mx>=COLS||my<0||my>=ROWS)continue;
+      const vis=fov[my][mx];if(vis===0)continue;
+      const t=map[my][mx];const px=x*TILE,py=y*TILE;
+      if(vis===1){
+        ctx.fillStyle=t===T.WALL?'#111118':'#0c0c14';ctx.fillRect(px,py,TILE,TILE);
+        if(t!==T.WALL){ctx.fillStyle='#1a1a2a';ctx.fillRect(px+1,py+1,TILE-2,TILE-2);}
+        continue;
+      }
+      if(t===T.WALL){
+        ctx.fillStyle='#1a1a2e';ctx.fillRect(px,py,TILE,TILE);
+        ctx.fillStyle='#222235';ctx.fillRect(px,py,TILE,1);ctx.fillRect(px,py,1,TILE);
+      }else if(t===T.FLOOR){
+        ctx.fillStyle='#12121f';ctx.fillRect(px,py,TILE,TILE);
+        ctx.fillStyle='#16162a';ctx.fillRect(px+1,py+1,TILE-2,TILE-2);
+      }else if(t===T.STAIRS){
+        ctx.fillStyle='#12121f';ctx.fillRect(px,py,TILE,TILE);
+        ctx.fillStyle='#2a4a7b';ctx.fillRect(px+2,py+2,TILE-4,TILE-4);
+        ctx.fillStyle='#5a8fdd';ctx.font='8px monospace';ctx.fillText('>',px+2,py+8);
+      }
+    }
+  }
+  items.forEach(item=>{
+    const vx=item.x-camX,vy=item.y-camY;
+    if(vx<0||vx>=vpW||vy<0||vy>=vpH||fov[item.y][item.x]!==2)return;
+    ctx.fillStyle=item.col;ctx.font='bold 9px monospace';ctx.fillText(item.sym,vx*TILE+2,vy*TILE+9);
+  });
+  enemies.forEach(e=>{
+    const vx=e.x-camX,vy=e.y-camY;
+    if(vx<0||vx>=vpW||vy<0||vy>=vpH||fov[e.y][e.x]!==2)return;
+    ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(vx*TILE,vy*TILE,TILE,TILE);
+    ctx.fillStyle=e.col;ctx.font='bold 10px monospace';ctx.fillText(e.sym,vx*TILE+2,vy*TILE+9);
+    const bw=TILE-2;
+    ctx.fillStyle='#333';ctx.fillRect(vx*TILE+1,vy*TILE-3,bw,2);
+    ctx.fillStyle=e.hp/e.maxHp>0.5?'#4ecb71':'#e05c5c';
+    ctx.fillRect(vx*TILE+1,vy*TILE-3,Math.round(bw*(e.hp/e.maxHp)),2);
+  });
+  const pvx=player.x-camX,pvy=player.y-camY;
+  ctx.fillStyle='rgba(155,143,255,0.15)';ctx.fillRect(pvx*TILE,pvy*TILE,TILE,TILE);
+  ctx.fillStyle='#9b8fff';ctx.font='bold 10px monospace';ctx.fillText('@',pvx*TILE+2,pvy*TILE+9);
+  const hpPct=player.hp/player.maxHp,bW=60,bH=4;
+  const bX=pvx*TILE+(TILE-bW)/2,bY=pvy*TILE-6;
+  ctx.fillStyle='#222';ctx.fillRect(bX,bY,bW,bH);
+  ctx.fillStyle=hpPct>0.5?'#4ecb71':hpPct>0.25?'#f7c94b':'#e05c5c';
+  ctx.fillRect(bX,bY,Math.round(bW*hpPct),bH);
+}
+document.addEventListener('keydown',e=>{
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].includes(e.key))e.preventDefault();
+  const km={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],W:[0,-1],S:[0,1],A:[-1,0],D:[1,0]};
+  const d=km[e.key];if(!d)return;
+  const kid={'-1,0':'key-left','1,0':'key-right','0,-1':'key-up','0,1':'key-down'}[d.join(',')];
+  if(kid){const k=document.getElementById(kid);k.classList.add('active');setTimeout(()=>k.classList.remove('active'),100);}
+  tryMove(d[0],d[1]);
+});
+initGame();
+</script>
+</body>
+</html>
